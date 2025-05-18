@@ -1,138 +1,107 @@
 # Job Family Mapping Tool
 
-This project provides tools for processing job data, mapping job positions to job families, and consolidating data into CSV format.
+This repository provides a set of scripts for processing job data. It can extract candidate records from an Excel file, map each position to a job family using Azure OpenAI, and finally consolidate all JSON results into a single CSV.
 
 ## Overview
 
-The project consists of two main tools:
+The project is composed of three main tools:
 
-1. **Job Family Mapping Tool**: Maps job positions to job families using OpenAI's GPT-4.1-mini model
-2. **JSON to CSV Consolidation Tool**: Consolidates multiple JSON files into a single CSV file with proper encoding
+1. **Excel Data Extraction Tool** (`extract_data.py`)
+   - Converts rows from the spreadsheet in `data/` into individual JSON files.
+2. **Job Family Mapping Tool** (`map_job_families.py`)
+   - Calls the Azure OpenAI Responses API to assign the most relevant job family and sub-family defined in `job-category.json`.
+3. **JSON to CSV Consolidation Tool** (`consolidate_json_to_csv.py`)
+   - Merges all mapped JSON files into a single CSV while preserving column order and Thai characters.
 
 ## Features
 
+- Convert Excel records to JSON files
 - Automatic job family mapping using AI
-- Batch processing of JSON files
+- Batch processing of JSON data
 - Data consolidation into a single CSV file
 - Proper UTF-8 encoding for Thai characters
-- Preservation of original data structure and column order
+- Preservation of the original column order
 
 ## Setup
 
 1. Ensure you have Python 3.8+ installed:
-   ```
+   ```bash
    python --version
    ```
-
 2. Clone the repository:
-   ```
+   ```bash
    git clone https://github.com/tkhongsap/mapping-job-family.git
    cd mapping-job-family
    ```
-
 3. Install required packages:
+   ```bash
+   pip install openai python-dotenv pandas
    ```
-   pip install openai python-dotenv
+4. Create a `.env` file with your Azure OpenAI credentials:
+   ```bash
+   AZURE_OPENAI_API_KEY=your_api_key
+   AZURE_API_VERSION=2025-03-01-preview
+   AZURE_OPENAI_MODEL_NAME=gpt-4.1
+   AZURE_OPENAI_DEPLOYMENT=gpt-4.1
    ```
-
-4. Configure OpenAI API key:
-   - Create a `.env` file in the root directory with your API key:
-     ```
-     OPENAI_API_KEY=your_api_key_here
-     ```
-   - Alternatively, you can pass it as a command-line argument when running the mapping script
 
 ## Directory Structure
 
 ```
 mapping-job-family/
-├── data/             # Input data directory
-├── output/           # Output directory for JSON files
-├── scr/              # Source code
-│   ├── map_job_families.py      # Job family mapping script
-│   └── consolidate_json_to_csv.py # JSON to CSV conversion script
-├── .env              # Environment variables (API keys)
-├── .env.example      # Example environment file
-├── job-category.json # Job category definitions
-└── README.md         # This file
+├── data/                     # Input files (Excel and PDF)
+├── output/                   # Generated JSON and CSV files (ignored by Git)
+├── scr/                      # Source code
+│   ├── extract_data.py           # Excel to JSON extraction script
+│   ├── map_job_families.py       # Job family mapping script
+│   ├── consolidate_json_to_csv.py # JSON to CSV conversion script
+│   ├── test_mapping.py           # Helper script for local testing
+│   └── test-connection.py        # Simple environment check
+├── job-category.json         # Job category definitions
+├── .env.example              # Example environment file
+└── README.md
 ```
 
 ## How to Run
 
-### Job Family Mapping
+### 1. Extract Data from Excel
 
-1. Place your job-category.json file in the root directory (already done)
-2. Ensure your output JSON files are in the `output/` directory with names matching `row_*.json`
-3. Run the script:
-   ```
-   python scr/map_job_families.py
-   ```
-   
-   Or with API key as argument:
-   ```
-   python scr/map_job_families.py --api-key=your_api_key_here
-   ```
+The sample spreadsheet is expected at `data/Data.xlsx`.
+Run the following command to create JSON files under `output/`:
+```bash
+python scr/extract_data.py --rows 20 --output output
+```
+Use `--rows -1` to process every row.
 
-### JSON to CSV Consolidation
+### 2. Map Job Families
 
-After the mapping process is complete, you can consolidate all JSON files into a single CSV file:
+After you have JSON files, execute the mapping script:
+```bash
+python scr/map_job_families.py
+```
+The script reads each `row_*.json` file, contacts Azure OpenAI, and writes back the mapped job family information.
 
-1. Run the consolidation script:
-   ```
-   python scr/consolidate_json_to_csv.py
-   ```
+### 3. Consolidate JSON to CSV
 
-2. The script will:
-   - Read all JSON files from the `output/` directory
-   - Combine them into a single CSV file
-   - Save the result to `output/consolidated.csv`
-
-3. Command-line options:
-   ```
-   python scr/consolidate_json_to_csv.py -h
-   ```
-   Available options:
-   - `-i`, `--input`: Specify input directory (default: "output")
-   - `-o`, `--output`: Specify output CSV path (default: "output/consolidated.csv")
-   - `-m`, `--max`: Limit maximum number of files to process
-
-4. Examples:
-   ```
-   # Process only the first 10 files
-   python scr/consolidate_json_to_csv.py -m 10
-   
-   # Specify custom input and output locations
-   python scr/consolidate_json_to_csv.py -i custom_input_dir -o results.csv
-   ```
+Finally, combine all JSON files into a single CSV:
+```bash
+python scr/consolidate_json_to_csv.py
+```
+Use `-h` to see available options for input directory, output path, and file limit.
 
 ## Output
 
-### Job Family Mapping Output
+### Mapping Output
 
-The mapping script will:
-1. Process each JSON file in the output directory
-2. Use OpenAI's API to map the "position" and "Industry" fields to a job family and sub-family
-3. Add "job_family" and "job_sub_family" fields to each JSON file
-4. Save the updated files back to the same location
+- Each processed JSON file gains `job_family` and `job_sub_family` fields.
 
-### CSV Consolidation Output
+### CSV Output
 
-The consolidation script will:
-1. Combine all mapped JSON files into a single CSV file
-2. Preserve the original column order from the JSON files
-3. Ensure proper UTF-8 encoding for Thai characters
-4. Add any new fields found in later files to the end of the column list
+- All mapped files are combined into `output/consolidated.csv`.
+- The original column order is preserved and UTF‑8 with BOM is used so Thai characters appear correctly in spreadsheet applications.
 
-## Technical Implementation
+## Technical Notes
 
-- The mapping script uses OpenAI's new Responses API (instead of the older Chat Completions API)
-- The consolidation script uses OrderedDict to maintain the original JSON structure
-- Both scripts properly handle UTF-8 encoding to support Thai characters
-- Natural sorting is used to ensure files are processed in numerical order (e.g., row_10.json comes after row_9.json)
+- The mapping script uses the new Azure OpenAI Responses API and includes a short delay between requests to respect rate limits.
+- Natural sorting ensures files are processed in numeric order (e.g., `row_10.json` after `row_9.json`).
 
-## Notes
-
-- The mapping script includes a 1-second delay between API calls to respect rate limits
-- Invalid mappings will be logged but processing will continue
-- Progress is displayed in the console for both scripts
-- The consolidation script uses UTF-8 with BOM (Byte Order Mark) to ensure proper display of Thai characters in applications like Microsoft Excel 
